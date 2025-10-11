@@ -1,0 +1,9 @@
+sounddevice
+numpy
+webrtcvad
+opencv-python
+pillow
+openai>=1.2.0
+elevenlabs
+python-dotenv
+requests
