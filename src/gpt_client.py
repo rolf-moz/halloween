@@ -41,6 +41,7 @@ class GPTClient:
         return f"Recent speech:\n{trimmed}"
 
     def generate(self, messages: list[dict[str, Any]]) -> Optional[str]:
+        print("Sending ChatGPT request")
         try:
             response = self.client.responses.create(model=self.config.model, input=messages)
         except Exception as exc:  # noqa: BLE001

@@ -40,6 +40,7 @@ class AudioListener:
         self.stream: Optional[sd.RawInputStream] = None
         self.transcripts: Deque[TranscriptSegment] = collections.deque()
         self.transcript_lock = threading.Lock()
+        self.input_device = self._resolve_input_device(self.config.input_device)
 
     def start(self) -> None:
         self.stop_event.clear()
@@ -49,6 +50,7 @@ class AudioListener:
                 blocksize=self.frame_size,
                 dtype="int16",
                 channels=1,
+                device=self.input_device,
                 callback=self._audio_callback,
             )
             self.stream.start()
@@ -119,6 +121,47 @@ class AudioListener:
         if voiced_frames:
             self._flush_frames(voiced_frames, min_frames)
 
+    def _resolve_input_device(self, desired: str | None) -> Optional[int]:
+        if not desired:
+            return None
+        desired = desired.strip()
+        if not desired:
+            return None
+        try:
+            index = int(desired)
+        except ValueError:
+            index = None
+        if index is not None:
+            try:
+                info = sd.query_devices(index, "input")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Input device #%s unavailable; using system default (%s)", index, exc)
+                return None
+            log.info("Using audio input device #%d: %s", index, info.get("name", "unknown"))
+            return index
+        try:
+            devices = sd.query_devices()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Unable to enumerate audio devices; using default input (%s)", exc)
+            return None
+        needle = desired.lower()
+        for idx, dev in enumerate(devices):
+            if dev.get("max_input_channels", 0) <= 0:
+                continue
+            name = str(dev.get("name", ""))
+            if name.lower() == needle:
+                log.info("Using audio input device '%s' (#%d)", name, idx)
+                return idx
+        for idx, dev in enumerate(devices):
+            if dev.get("max_input_channels", 0) <= 0:
+                continue
+            name = str(dev.get("name", ""))
+            if needle in name.lower():
+                log.info("Using audio input device '%s' (#%d)", name, idx)
+                return idx
+        log.warning("Audio input device '%s' not found; using system default", desired)
+        log.info("Run `python -m sounddevice` to list available devices")
+        return None
 
     def pause(self) -> None:
         if not self.pause_event.is_set():

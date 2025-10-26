@@ -19,6 +19,7 @@ class WhisperConfig:
     min_voice_ms: int = int(os.getenv("VOICE_MIN_MS", 1000))
     history_seconds: int = int(os.getenv("TRANSCRIPT_HISTORY_SECONDS", 30))
     api_key: str | None = os.getenv("WHISPER_API_KEY") or os.getenv("OPENAI_API_KEY")
+    input_device: str | None = os.getenv("VOICE_INPUT_DEVICE")
 
 
 @dataclass

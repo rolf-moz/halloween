@@ -41,6 +41,7 @@ Optional overrides:
 - `WHISPER_MODEL` to pick a different transcription model
 - `WHISPER_API_KEY` if you prefer a dedicated key
 - `CAPTURE_OUTPUT_DIR` to change where photos land (default `./captures`)
+- `VOICE_INPUT_DEVICE` to force a specific microphone (name or index as reported by PortAudio)
 
 ## Running
 ```bash
@@ -59,6 +60,27 @@ Stop with `Ctrl+C`.
 - Whisper, GPT, and ElevenLabs clients log errors but keep the app alive so transient failures do not crash the show.
 - Detection uses OpenCV's Haar cascade; swap in a stronger detector if you need higher accuracy.
 - Transcription uses OpenAI's hosted Whisper API, so no local server is required.
+
+### Audio routing tips
+
+If you connect a Bluetooth speaker that also exposes a microphone, macOS may switch both the input and output devices. The app now lets you pin the input device so you can keep the built-in Mac microphone while sending playback to the Bluetooth speaker:
+
+1. List available audio devices (names and indices) once your gear is connected:
+   ```bash
+   python - <<'PY'
+   import sounddevice as sd
+   for idx, dev in enumerate(sd.query_devices()):
+       if dev.get("max_input_channels", 0) > 0:
+           print(f"{idx}: {dev['name']} (inputs: {dev['max_input_channels']})")
+   PY
+   ```
+2. Set `VOICE_INPUT_DEVICE` in your `.env` to either the index or a substring of the microphone name, e.g.:
+   ```bash
+   VOICE_INPUT_DEVICE="MacBook Pro Microphone"
+   ```
+3. macOS System Settings → Sound → Output: pick your Bluetooth speaker. Input can stay on “MacBook Pro Microphone” (or whatever mic you pinned).
+
+Playback uses `afplay`, which follows the system output device, so narration automatically routes to whatever you set for output.
 
 
 ## VS Code Setup

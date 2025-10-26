@@ -90,6 +90,7 @@ class HalloweenOrchestrator:
         return latest
 
     def _handle_event(self, event: CameraEvent) -> None:
+        print("handl event")
         if self.events_since_reset > 20:
             log.info("Resetting conversation after 20 events")
             self._reset_conversation()
@@ -110,18 +111,22 @@ class HalloweenOrchestrator:
                 return
         if event.image_path and include_image:
             self.images_sent += 1
+        print("Sending AI message")
         messages = self._prepare_messages(user_text, event.image_path if include_image else None)
         response = self.gpt.generate(messages)
+        print("Got AI response")
         self.events_since_reset += 1
         if not response:
             log.warning("GPT did not return text for %s", event.image_path)
             return
         self._record_conversation(user_text, response)
         self.audio.pause()
+        print("speaking")
         try:
             self.voice.speak(response)
         finally:
             self.audio.resume()
+        print("done speaking")
 
     def _prepare_messages(self, user_text: str, image_path: Optional[Path]) -> list[dict[str, object]]:
         messages = list(self.conversation)
