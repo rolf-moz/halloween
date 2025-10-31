@@ -82,13 +82,18 @@ class AudioListener:
 
     def _process_frames(self) -> None:
         voiced_frames: list[bytes] = []
+        activation_frames = max(1, self.config.activation_ms // self.frame_duration_ms)
+        pending_frames: Deque[bytes] = collections.deque(maxlen=activation_frames)
         voice_active = False
+        speech_run = 0
         last_voice_time = 0.0
         min_frames = max(1, self.config.min_voice_ms // self.frame_duration_ms)
         silence_limit = self.config.silence_timeout
         while not self.stop_event.is_set():
             if self.pause_event.is_set():
                 voiced_frames.clear()
+                pending_frames.clear()
+                speech_run = 0
                 time.sleep(0.05)
                 continue
             try:
@@ -97,6 +102,8 @@ class AudioListener:
                 frame = None
             now = time.time()
             if frame is None:
+                pending_frames.clear()
+                speech_run = 0
                 if voice_active and now - last_voice_time > silence_limit:
                     self._flush_frames(voiced_frames, min_frames)
                     voiced_frames.clear()
@@ -108,13 +115,23 @@ class AudioListener:
             except Exception as exc:  # noqa: BLE001
                 log.debug("VAD failed on frame: %s", exc)
             if is_speech:
-                voiced_frames.append(frame)
-                voice_active = True
-                last_voice_time = now
-            else:
+                speech_run += 1
                 if voice_active:
                     voiced_frames.append(frame)
-                if voice_active and now - last_voice_time > silence_limit:
+                    last_voice_time = now
+                else:
+                    pending_frames.append(frame)
+                    if speech_run >= activation_frames:
+                        voice_active = True
+                        voiced_frames.extend(pending_frames)
+                        pending_frames.clear()
+                        last_voice_time = now
+                continue
+            speech_run = 0
+            pending_frames.clear()
+            if voice_active:
+                voiced_frames.append(frame)
+                if now - last_voice_time > silence_limit:
                     self._flush_frames(voiced_frames, min_frames)
                     voiced_frames.clear()
                     voice_active = False
@@ -187,6 +204,7 @@ class AudioListener:
             return
         wav_bytes = self._frames_to_wav(frames)
         frames.clear()
+        print("transcribing")
         result = self.whisper_client.transcribe_wav(wav_bytes)
         if not result:
             return
